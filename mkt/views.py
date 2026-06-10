@@ -1,4 +1,4 @@
-from mkt.models import Ad, Comment
+from mkt.models import Ad, Comment, Fav
 from django.views import View
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
@@ -11,8 +11,20 @@ from mkt.forms import CreateForm, CommentForm
 
 class AdListView(OwnerListView):
     model = Ad
-    # By convention:
-    # template_name = "myarts/article_list.html"
+    template_name = "mkt/ad_list.html"
+
+    def get(self, request) :
+        ad_list = Ad.objects.all()
+        favorites = list()
+        if request.user.is_authenticated:
+            # rows = [{'id': 2}, {'id': 4} ... ]  (A list of rows)
+            rows = request.user.favorite_ads.values('id')
+            print(rows)
+            # favorites = [2, 4, ...] using list comprehension
+            favorites = [ row['id'] for row in rows ]
+        print(favorites)
+        ctx = {'ad_list' : ad_list, 'favorites': favorites}
+        return render(request, self.template_name, ctx)
 
 
 class AdDetailView(OwnerDetailView):
@@ -103,3 +115,23 @@ class CommentDeleteView(OwnerDeleteView):
         ad = self.object.ad
         return reverse('mkt:ad_detail', args=[ad.id])
 
+
+# csrf exemption in class based views
+# https://stackoverflow.com/questions/16458166/how-to-disable-djangos-csrf-validation
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from django.db.utils import IntegrityError
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ToggleFavoriteView(LoginRequiredMixin, View):
+
+    def post(self, request, pk) :
+        t = get_object_or_404(Ad, id=pk)
+        fav = Fav(user=request.user, ad=t)
+        try:
+            fav.save()
+            return HttpResponse("Favorite added 42")
+        except IntegrityError:  # Already there, lets delete...
+            Fav.objects.get(user=request.user, ad=t).delete()
+            return HttpResponse("Favorite deleted 42")
+        return HttpResponse("Something went wrong")

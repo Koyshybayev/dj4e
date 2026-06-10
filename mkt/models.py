@@ -16,6 +16,8 @@ class Ad(models.Model) :
     field2 = models.CharField(max_length=200, null=True)
     field3 = models.CharField(max_length=500, null=True)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    favorites = models.ManyToManyField(settings.AUTH_USER_MODEL,
+        through='Fav', related_name='favorite_ads')
     comments = models.ManyToManyField(settings.AUTH_USER_MODEL,
         through='Comment', related_name='comments_owned')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -48,3 +50,16 @@ class Comment(models.Model) :
     def __str__(self):
         if len(self.text) < 15 : return self.text
         return self.text[:11] + ' ...'
+
+class Fav(models.Model) :
+
+    ad = models.ForeignKey(Ad, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='favwc_users')
+
+    # https://docs.djangoproject.com/en/5.2/ref/models/options/#unique-together
+    class Meta:
+        unique_together = ('ad', 'user')
+
+    def __str__(self) :
+        return '%s likes %s'%(self.user.username, self.thing.title[:10])
